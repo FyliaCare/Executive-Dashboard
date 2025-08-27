@@ -124,7 +124,8 @@ def read_sql(sql: str, params: tuple = (), db_path: str = DB_PATH) -> pd.DataFra
 
 def clear_cache_and_refresh():
     st.cache_data.clear()
-    st.rerun()
+    st.session_state["refresh"] = True
+
 
 def df_to_excel_bytes(dfs: Dict[str, pd.DataFrame]) -> bytes:
     out = BytesIO()
