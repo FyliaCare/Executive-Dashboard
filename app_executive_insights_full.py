@@ -124,8 +124,7 @@ def read_sql(sql: str, params: tuple = (), db_path: str = DB_PATH) -> pd.DataFra
 
 def clear_cache_and_refresh():
     st.cache_data.clear()
-    st.session_state["refresh"] = True
-
+    st.experimental_rerun()
 
 def df_to_excel_bytes(dfs: Dict[str, pd.DataFrame]) -> bytes:
     out = BytesIO()
@@ -627,7 +626,7 @@ def page_executive_insights():
                         # reset the control to avoid repeated triggers and then refresh
                         st.session_state[key] = False
                         st.success("Marked done — refreshing dashboard")
-                        st.rerun()
+                        st.experimental_rerun()
                 else:
                     st.write(text)
 
@@ -773,7 +772,7 @@ def page_action_points():
                     commit=True,
                 )
                 st.success("✅ Action point created.")
-                st.rerun()
+                st.experimental_rerun()
 
     st.markdown("---")
     st.subheader("Edit or Delete action point")
@@ -869,7 +868,7 @@ def page_action_points():
                     )
 
                 st.success("✅ Action point updated.")
-                st.rerun()
+                st.experimental_rerun()
 
         # DELETE SECTION
         st.error("⚠️ Danger zone — Delete this action point permanently")
@@ -878,7 +877,7 @@ def page_action_points():
             run_sql("DELETE FROM activity_logs WHERE action_point_id=?", (aid,), commit=True)
             run_sql("DELETE FROM action_points WHERE id=?", (aid,), commit=True)
             st.success(f"🗑️ Action point #{aid} deleted.")
-            st.rerun()
+            st.experimental_rerun()
 
 def page_reports_and_export():
     st.markdown("# 📤 Reports & Export")
