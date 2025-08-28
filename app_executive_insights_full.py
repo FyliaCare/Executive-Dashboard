@@ -286,40 +286,66 @@ def compute_kpis(df_actions: pd.DataFrame, df_clients: pd.DataFrame) -> Dict[str
         'avg_days_to_complete': avg_days
     }
 
-def weekly_progression(df_actions: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
-    if start > end:
-        start, end = end, start
-    dfa = df_actions.copy()
-    if 'created_at' in dfa:
-        dfa['created_date'] = dfa['created_at'].dt.date
-    else:
-        dfa['created_date'] = pd.NaT
-    if 'completed_at' in dfa:
-        dfa['completed_date'] = dfa['completed_at'].dt.date
-    else:
-        dfa['completed_date'] = pd.NaT
+def weekly_progression(dfa: pd.DataFrame, start: date, end: date) -> pd.DataFrame:
+    """Compute weekly created vs completed counts and completion %."""
+    if dfa.empty:
+        return pd.DataFrame()
+
+    df = dfa.copy()
+
+    # Ensure datetime conversion
+    df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+    df['completed_at'] = pd.to_datetime(df['completed_at'], errors='coerce')
+
+    # Use pandas Timestamps, not .dt.date (avoids dtype errors)
+    df['created_date'] = df['created_at'].dt.normalize()
+    df['completed_date'] = df['completed_at'].dt.normalize()
+
     start_dt = pd.to_datetime(start).normalize()
     end_dt = pd.to_datetime(end).normalize()
+
     week_starts = pd.date_range(start=start_dt, end=end_dt, freq='W-MON')
-    if len(week_starts) == 0 or week_starts[0].date() > start:
+    if len(week_starts) == 0 or week_starts[0] > start_dt:
         week_starts = pd.DatetimeIndex([start_dt]).union(week_starts)
+
     rows = []
-    for wstart in week_starts:
-        wstart_date = wstart.date()
-        wend_date = (wstart_date + timedelta(days=6))
-        created = int(dfa[(dfa['created_date'] >= wstart_date) & (dfa['created_date'] <= wend_date)].shape[0])
-        completed = int(dfa[(dfa['completed_date'] >= wstart_date) & (dfa['completed_date'] <= wend_date)].shape[0])
+    for w in week_starts:
+        wstart = w
+        wend = wstart + timedelta(days=6)
+
+        created = int(df[(df['created_date'] >= wstart) & (df['created_date'] <= wend)].shape[0])
+        completed = int(df[(df['completed_date'] >= wstart) & (df['completed_date'] <= wend)].shape[0])
+
         pct = round(100 * completed / created, 2) if created > 0 else None
-        rows.append({'week_start': wstart_date, 'week_end': wend_date, 'created': created, 'completed': completed, 'completion_pct': pct})
+
+        rows.append({
+            'week_start': wstart.date(),
+            'week_end': wend.date(),
+            'created': created,
+            'completed': completed,
+            'completion_pct': pct
+        })
+
     return pd.DataFrame(rows)
 
-def compute_funnel(df_actions: pd.DataFrame, stages: Optional[List[str]] = None) -> pd.DataFrame:
+
+def compute_funnel(dfa: pd.DataFrame, stages: Optional[List[str]] = None) -> pd.DataFrame:
+    """Compute sales funnel counts based on tags column."""
     if stages is None:
-        stages = ['intro','site','proposal','negotiation','contract','won']
-    if df_actions.empty:
+        stages = ['intro', 'site', 'proposal', 'negotiation', 'contract', 'won']
+
+    if dfa.empty:
         return pd.DataFrame([{'stage': s.capitalize(), 'count': 0} for s in stages])
-    text_series = df_actions['tags'].fillna('').astype(str).str.lower()
-    rows = [{'stage': s.capitalize(), 'count': int(text_series.str.contains(s).sum())} for s in stages]
+
+    text_series = dfa['tags'].fillna('').astype(str).str.lower()
+
+    rows = []
+    for s in stages:
+        rows.append({
+            'stage': s.capitalize(),
+            'count': int(text_series.str.contains(rf"\b{s}\b").sum())
+        })
+
     return pd.DataFrame(rows)
 
 def region_engagements(df_actions: pd.DataFrame) -> pd.DataFrame:
